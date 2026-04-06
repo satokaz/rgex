@@ -1,8 +1,8 @@
 # rgex driver 
 
-`rgex` is a Solaris 11.4 GLDv3 network driver for the Realtek `RTL8125B` 2.5GbE controller (`pci10ec,8125`).
+> This driver was created by an AI coding agent.
 
-This driver was created by an AI coding agent.
+`rgex` is a Solaris 11.4 GLDv3 network driver for the Realtek `RTL8125B` 2.5GbE controller (`pci10ec,8125`).
 
 The development and validation NIC used in this repository is `RTL8125B`.
 Some implementation notes still mention `RTL8125B` because the low-level register, descriptor, PHY, and vendor-driver behavior is often described as the
