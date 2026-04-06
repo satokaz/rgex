@@ -11,6 +11,13 @@ Target platform:
 - Solaris 11.4 x86 SRU 90 and later (including CBE 90)
 - Realtek `RTL8125B`
 
+Tested throughput on the current stable configuration:
+
+- IPv4 TX: about `2.35 Gbps`
+- IPv4 RX: about `2.19 Gbps`
+- IPv6 TX: about `2.32 Gbps`
+- IPv6 RX: about `2.02 Gbps`
+  
 Implemented features:
 
 - device attach for `pci10ec,8125`
@@ -29,8 +36,9 @@ Implemented features:
 Cautions:
 
 - production use is currently centered on a single RX/TX ring
-- multi-ring/RSS remains frozen on the current host until a `22+` MSI-X vector environment is available
-- LSO/TSO is implemented but intentionally disabled in the default production configuration
+- do not enable multi-ring, RSS, LSO, or TSO in deployed configurations
+  - multi-ring/RSS remains frozen on the current host until a `22+` MSI-X vector environment is available
+  - LSO/TSO is implemented but intentionally disabled in the default production configuration
 - jumbo support is currently capped at `9000` MTU
 - PTP / IEEE 1588v2, AVB, and WoL / RealWoW are not implemented
 
