@@ -1,0 +1,176 @@
+#
+# rgex.conf.master — canonical reference configuration for the rgex driver
+#
+# This is the single source of truth for all recognised driver.conf properties.
+# Copy to /kernel/drv/rgex.conf and adjust the stanza header (name=, parent=,
+# unit-address=) for your hardware before deploying.
+#
+# Format: Solaris driver.conf(5).  Each stanza ends with ';'.
+# Comments ('#') must appear on their own line, not inside a stanza.
+# Statements span newlines freely until the closing ';'.
+#
+# Discover your hardware path:
+#   prtconf -vp | grep -B2 -A20 "RTL8125"
+#   cat /etc/driver_aliases | grep rgex
+#
+# Generate a host-specific conf automatically:
+#   tools/rgex_write_rgex_conf.sh [mtu] [tx-single-desc-limit] [tx-split-len] [outpath]
+#
+# Quick start — most systems need only these entries:
+#
+#   name="pci10ec,8125" target-instance=0;
+#   name="pci10ec,8125" parent="/pci@0,0/<bridge>" unit-address="0"
+#       msix-runtime-mode=0
+#       rx-fcs-subtract-diagnostic=1;
+#
+
+# ===========================================================================
+# PROPERTY REFERENCE
+# ===========================================================================
+#
+# --- MSI-X / Interrupt -------------------------------------------------
+#
+# msix-runtime-mode  int  default=1  [0, 1, 2]
+#   Primary interrupt mode selector.  This single property overrides all
+#   individual allow-msix-* flags via an internal switch at attach.
+#     0 = safe / INTX or MSI (1 vector)            — always stable, fallback
+#     1 = small-layout MSI-X (5 vectors)            — default, validated (AMD Zen ≥5 budget)
+#     2 = full-vector MSI-X  (22+ vectors required) — falls back if budget < 22
+#
+# allow-msix               bool  default=AUTO  AUTOMATICALLY SET by msix-runtime-mode.
+# allow-msix-real-request  bool  default=AUTO  AUTOMATICALLY SET by msix-runtime-mode.
+#   Both flags are set unconditionally by the mode switch; any conf value is
+#   overwritten at attach.  Do not set either property in conf.
+#
+# allow-msix-budgeted-request           bool  default=0  [0, 1]
+#   Allow a host-budget-capped MSI-X request.  Auto-set to 1 for mode=1/2.
+#   Only set here to force-disable when the mode switch would set it to 1.
+#
+# allow-msix-tx-per-ring-experimental   bool  default=0  [0, 1]
+#   Enable TX-per-ring MSI-X topology.  Auto-set to 1 for mode=1.
+#
+# allow-msix-v2-full-vector-experimental  bool  default=0  [0, 1]
+#   Enable full-vector MSI-X topology.  Auto-set to 1 for mode=2.
+#
+# allow-msix-alloc-limit-override       bool  default=0  [0, 1]
+#   Allow override of the MSI-X allocation limit during vector negotiation.
+#
+# msix-request-count-override  int  default=0  [0..64]
+#   Override the number of MSI-X vectors to request.  0 = computed value.
+#
+# msix-v2-followup-stage  int  default=0  [0..28]
+#   Enable incremental MSI-X V2 OCP follow-up register writes up to stage N.
+#   0 = disabled (recommended for safe path).
+#   Note: stages >= 1 write E614/E63E routing registers, but ISR v2 per-vector
+#   HW dispatch requires >= 22 vectors.  On < 22 vector hosts, stage >= 1 has
+#   no routing effect.
+#
+# intr-miti-tx-timer-diagnostic  int  default=-1  [-1, 0..255]
+#   Override the MITI_V2 TX completion interrupt coalescing timer.
+#   -1 = use profile default (0 = no coalescing).
+#   Non-zero values set coalescing delay (unit ~4 us).
+#   Recommended: 32 (~128 us) — reduces TX softint CPU from ~46% to < 5%
+#   with no throughput loss (TX recycling occurs inline during send path).
+#
+# --- RX ----------------------------------------------------------------
+#
+# rx-ring-count  int  default=1  [1..4]
+#   Number of RX descriptor rings.  Only single-ring (1) is validated stable.
+#   Multi-ring mode may stall in POLLED interrupt mode.
+#
+# rx-fcs-subtract-diagnostic  bool  default=1  [0, 1]
+#   Subtract the 4-byte Ethernet FCS from the NIC-reported frame length.
+#   RTL8125B includes FCS bytes in the RX descriptor length field.
+#   *** MUST remain 1 ***.  Setting to 0 causes all full-size frames
+#   (reported length 1518 > ETHERMAX 1514) to be silently dropped.
+#
+# rx-vlan-insert-diagnostic  bool  default=1  [0, 1]
+#   Enable software VLAN tag reconstruction from the RTL8125 opts2 field.
+#   Validated: VLAN 99 tested at 2.35 Gbps TX / 2.06 Gbps RX, zero chip_reset.
+#   Leave at default (1).
+#
+# rx-force-bcopy-diagnostic  bool  default=0  [0, 1]
+#   Force all received frames to be bcopy'd instead of zero-copy DMA.
+#   Diagnostic use only; disables zero-copy performance path.
+#
+# rx-short2-rescue-diagnostic  bool  default=0  [0, 1]
+#   Attempt to rescue short Ethernet type-2 frames below minimum size.
+#
+# rx-rss-force-ring-diagnostic  int  default=-1  [-1, 0..3]
+#   Force all RX traffic to a specific ring index.  -1 = disabled.
+#
+# --- TX ----------------------------------------------------------------
+#
+# tx-hcksum-disable-diagnostic  bool  default=0  [0, 1]
+#   Disable TX hardware checksum offload; fall back to software checksums.
+#   When 1, also suppresses HCK_FULLCKSUM advertisement to the MAC framework.
+#
+# disable-tx-capab-rings-diagnostic  bool  default=0  [0, 1]
+#   Disable TX capability rings; force all transmit through the service ring.
+#
+# tx-steer-service-fixed  bool  default=0  [0, 1]
+#   Fix TX steering to always use the service ring.
+#
+# tx-steer-force-ring  int  default=-1  [-1, 0..N]
+#   Force all m_tx traffic to a specific TX ring.  -1 = disabled.
+#
+# tx-ring-callback-force-ring-diagnostic  int  default=-1  [-1, 0..N]
+#   Force the TX ring callback path to a specific ring.  -1 = disabled.
+#
+# --- PCIe AER ----------------------------------------------------------
+#
+# allow-parent-aer-ca-mask   bool  default=1  [0, 1]
+#   Mask correctable AER errors on the PCIe parent bridge.
+#   Default 1 (opt-in); actual activation gated on hardware probe:
+#     * AMD vendor ID on PCIe parent (RGEX_PCI_VENDOR_AMD)
+#     * Standard PCIe capability present in parent config space
+#     * AER extended capability present (parent_aer_off >= PCIE_EXT_CAP)
+#   On non-AMD / non-AER hardware the default 1 is harmless (gate rejects).
+#   Set to 0 here to force-disable on AMD hardware.
+#
+# allow-parent-aer-ca-refresh  bool  default=1  [0, 1]
+#   Re-read and refresh parent AER correctable error status periodically.
+#   Only effective when allow-parent-aer-ca-mask is also active.
+#
+# --- General -----------------------------------------------------------
+#
+# default_mtu  int  default=1500  [1500, 9000]
+#   Default MTU at attach time.  9000 enables jumbo frame support.
+#
+# target-instance  int  default=-1  [-1, 0..N]
+#   Restrict attach to a single instance number.  -1 = all instances.
+#   Typically used in a guard stanza (without parent= / unit-address=).
+#
+# rgex_debug_flags  uint32  default=0  [bitmask]
+#   Driver debug verbosity bitmask.  0 = silent.
+#
+# ===========================================================================
+# DEPLOYMENT STANZA
+# ===========================================================================
+#
+# Edit parent= and unit-address= to match your hardware.
+# Remove comments for any optional property you wish to override.
+
+# Guard stanza: restrict these properties to instance 0 only.
+name="pci10ec,8125" target-instance=0;
+
+# Main stanza: properties applied at attach for the matching device.
+name="pci10ec,8125" parent="/pci@0,0/pci1022,14db@3,1" unit-address="0"
+
+    # Interrupt mode: 0=safe/INTX, 1=small-layout MSI-X (default), 2=full-vector.
+    # Mode 1 validated: 2345 Mbps TX / 2210 Mbps RX sustained, chip_reset=0 (3x60s each).
+    msix-runtime-mode=1
+
+    # RX: FCS subtract MUST be 1 (see property reference above).
+    rx-fcs-subtract-diagnostic=1
+
+    # TX interrupt coalescing: reduces TX softint CPU ~46% -> <5%.
+    # Recommended for mode 1. See docs/CONF_PROPERTIES_REFERENCE.md.
+    intr-miti-tx-timer-diagnostic=32
+
+    # Optional overrides (uncomment and set as needed):
+    # rx-ring-count=1
+    # allow-parent-aer-ca-mask=0
+    # allow-parent-aer-ca-refresh=0
+    # tx-hcksum-disable-diagnostic=0
+    ;
